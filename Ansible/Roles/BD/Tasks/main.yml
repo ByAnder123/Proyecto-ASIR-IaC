@@ -79,7 +79,7 @@
     login_user: root
     login_password: "Password123"
     login_unix_socket: /var/run/mysqld/mysqld.sock
-
+ 
 - name: Insertar usuario de prueba para el login
   mysql_query:
     login_db: proyecto_asir
