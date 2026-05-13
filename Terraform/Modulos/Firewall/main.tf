@@ -5,6 +5,7 @@ resource "aws_network_interface" "firewall_web" {
     subnet_id = var.subred_web_id
     private_ips = ["192.168.2.10"]
     source_dest_check = false
+    security_groups = [aws_security_group.sg_firewall.id]
     tags = {
         Name = "Red-Firewall-Web"
     }
@@ -14,6 +15,7 @@ resource "aws_network_interface" "firewall_bd" {
     subnet_id = var.subred_bd_id
     private_ips = ["192.168.3.10"]
     source_dest_check = false
+    security_groups = [aws_security_group.sg_firewall.id]
     tags = {
         Name = "Red-Firewall-BD"
     }

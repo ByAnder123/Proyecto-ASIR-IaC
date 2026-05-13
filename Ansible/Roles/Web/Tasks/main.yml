@@ -16,14 +16,13 @@
     - name: Renombrar la pagina por defecto de Apache (La usaremos como Dashboard)
       command: mv /var/www/html/index.html /var/www/html/dashboard.html
       args:
-        creates: /var/www/html/dashboard.html # Idempotencia: solo lo hace si no existe
+        creates: /var/www/html/dashboard.html
 
     - name: Crear pagina principal y de Login (index.php)
       copy:
         dest: /var/www/html/index.php
         content: |
           <?php
-          // 1. LÓGICA DE LOGIN (Debe ir antes de cualquier HTML)
           $error_msg = "";
           if(isset($_GET['user']) && isset($_GET['pass'])) {
               $conn = new mysqli("192.168.3.20", "admin", "1234", "proyecto_asir");
@@ -37,8 +36,10 @@
               $sql = "SELECT * FROM usuarios WHERE usuario='$u' AND password='$p'";
               $result = $conn->query($sql);
               
-              if ($result->num_rows > 0) {
-                  // ¡ÉXITO! Redirigimos a la página por defecto de Apache
+              // Control de excepciones robusto
+              if (!$result) {
+                  $error_msg = "<p style='color:red;'><b>Error SQL:</b> " . $conn->error . "</p>";
+              } elseif ($result->num_rows > 0) {
                   header("Location: dashboard.html");
                   exit();
               } else {
@@ -74,19 +75,20 @@
           if(isset($_GET['new_user']) && isset($_GET['new_pass'])) {
               $conn = new mysqli("192.168.3.20", "admin", "1234", "proyecto_asir");
               if ($conn->connect_error) {
-                  die("Conexion fallida.");
+                  die("Conexion fallida: " . $conn->connect_error);
               }
               
               $u = $_GET['new_user'];
               $p = $_GET['new_pass'];
               
-              // Intentamos crear el usuario
               $sql = "INSERT INTO usuarios (usuario, password) VALUES ('$u', '$p')";
+              $result = $conn->query($sql);
               
-              if ($conn->query($sql) === TRUE) {
+              // Control de excepciones en la inserción
+              if ($result === TRUE) {
                   echo "<p style='color:green;'><b>Exito:</b> El usuario '$u' ha sido registrado. Ya puedes hacer login.</p>";
               } else {
-                  echo "<p style='color:red;'><b>Error al registrar:</b> Ese nombre de usuario ya esta en uso.</p>";
+                  echo "<p style='color:red;'><b>Error SQL:</b> " . $conn->error . "</p>";
               }
               $conn->close();
           }

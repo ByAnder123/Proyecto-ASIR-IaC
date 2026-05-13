@@ -76,25 +76,28 @@ resource "aws_launch_template" "plantilla_web" {
     key_name = var.clave_ssh
     vpc_security_group_ids = [aws_security_group.sg_web.id]
 
-    #==============================================#
-    # SISTEMA ANSIBLE-PULL (Configuración Autónoma)#
-    #==============================================#
-    user_data = base64encode(<<-EOF
-                #!/bin/bash
-                # 1. Instalamos Ansible y Git
-                apt-get update
-                apt-get install -y software-properties-common
-                add-apt-repository --yes --update ppa:ansible/ansible
-                apt-get install -y ansible git
+#===================================#
+# Configuración Autónoma de Ansible #
+#===================================#
+user_data = base64encode(<<-EOF
+            #!/bin/bash
 
-                # 2. Clonamos tu repositorio de GitHub (¡Sustituye esta URL!)
-                git clone https://github.com/TuUsuario/TuRepo.git /tmp/mi_proyecto
+            sleep 90
+            
+            # 1. Instalamos Ansible y Git
+            apt-get update
+            apt-get install -y software-properties-common
+            add-apt-repository --yes --update ppa:ansible/ansible
+            apt-get install -y ansible git
 
-                # 3. Entramos en la carpeta y ejecutamos el playbook web localmente
-                cd /tmp/mi_proyecto/Ansible
-                ansible-playbook playbook_web.yml
-                EOF
-    )
+            # 2. Clonamos el repositorio de GitHub
+            git clone https://github.com/ByAnder123/Proyecto-ASIR-IaC /tmp/mi_proyecto
+
+            # 3. Entramos en la carpeta y ejecutamos el playbook web localmente
+            cd /tmp/mi_proyecto/Ansible/Roles/Web/Tasks
+            ansible-playbook main.yml
+            EOF
+)
 
     tag_specifications {
         resource_type = "instance"

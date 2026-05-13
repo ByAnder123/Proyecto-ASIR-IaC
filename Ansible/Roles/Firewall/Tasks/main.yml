@@ -81,7 +81,7 @@
     content: |
       *nat
       :POSTROUTING ACCEPT [0:0]
-      -A POSTROUTING -s 192.168.0.0/16 -j MASQUERADE
+      -A POSTROUTING -s 192.168.0.0/16 -o ens5 -j MASQUERADE
       COMMIT
 
 - name: Recargar UFW para aplicar el NAT nativo
