@@ -13,7 +13,7 @@
         state: present
         update_cache: yes
 
-    - name: Renombrar la pagina por defecto de Apache (La usaremos como Dashboard)
+    - name: Renombrar la pagina por defecto de Apache
       command: mv /var/www/html/index.html /var/www/html/dashboard.html
       args:
         creates: /var/www/html/dashboard.html
@@ -25,27 +25,27 @@
           <?php
           $error_msg = "";
           if(isset($_GET['user']) && isset($_GET['pass'])) {
-              $conn = new mysqli("192.168.3.20", "admin", "1234", "proyecto_asir");
-              if ($conn->connect_error) {
-                  die("Conexion fallida: " . $conn->connect_error);
+              try {
+                  // Intentamos la conexion y la consulta
+                  $conn = new mysqli("192.168.3.20", "admin", "1234", "proyecto_asir");
+                  
+                  $u = $_GET['user'];
+                  $p = $_GET['pass'];
+                  
+                  $sql = "SELECT * FROM usuarios WHERE usuario='$u' AND password='$p'";
+                  $result = $conn->query($sql);
+                  
+                  if ($result->num_rows > 0) {
+                      header("Location: dashboard.html");
+                      exit();
+                  } else {
+                      $error_msg = "<p style='color:red;'><b>Error:</b> Credenciales incorrectas.</p>";
+                  }
+                  $conn->close();
+              } catch (Exception $e) {
+                  // Si PHP 8.1 lanza una excepcion, la atrapamos aqui
+                  $error_msg = "<p style='color:red;'><b>Excepcion Capturada:</b> " . $e->getMessage() . "</p>";
               }
-              
-              $u = $_GET['user'];
-              $p = $_GET['pass'];
-              
-              $sql = "SELECT * FROM usuarios WHERE usuario='$u' AND password='$p'";
-              $result = $conn->query($sql);
-              
-              // Control de excepciones robusto
-              if (!$result) {
-                  $error_msg = "<p style='color:red;'><b>Error SQL:</b> " . $conn->error . "</p>";
-              } elseif ($result->num_rows > 0) {
-                  header("Location: dashboard.html");
-                  exit();
-              } else {
-                  $error_msg = "<p style='color:red;'><b>Error:</b> Credenciales incorrectas.</p>";
-              }
-              $conn->close();
           }
           ?>
           
@@ -73,24 +73,20 @@
           echo "<h1>Registro de Usuarios</h1>";
 
           if(isset($_GET['new_user']) && isset($_GET['new_pass'])) {
-              $conn = new mysqli("192.168.3.20", "admin", "1234", "proyecto_asir");
-              if ($conn->connect_error) {
-                  die("Conexion fallida: " . $conn->connect_error);
-              }
-              
-              $u = $_GET['new_user'];
-              $p = $_GET['new_pass'];
-              
-              $sql = "INSERT INTO usuarios (usuario, password) VALUES ('$u', '$p')";
-              $result = $conn->query($sql);
-              
-              // Control de excepciones en la inserción
-              if ($result === TRUE) {
+              try {
+                  $conn = new mysqli("192.168.3.20", "admin", "1234", "proyecto_asir");
+                  
+                  $u = $_GET['new_user'];
+                  $p = $_GET['new_pass'];
+                  
+                  $sql = "INSERT INTO usuarios (usuario, password) VALUES ('$u', '$p')";
+                  $conn->query($sql);
+                  
                   echo "<p style='color:green;'><b>Exito:</b> El usuario '$u' ha sido registrado. Ya puedes hacer login.</p>";
-              } else {
-                  echo "<p style='color:red;'><b>Error SQL:</b> " . $conn->error . "</p>";
+                  $conn->close();
+              } catch (Exception $e) {
+                  echo "<p style='color:red;'><b>Error SQL:</b> " . $e->getMessage() . "</p>";
               }
-              $conn->close();
           }
 
           echo "<form action='registro.php' method='GET'>";
@@ -108,7 +104,7 @@
         group: www-data
         recurse: yes
 
-    - name: Reiniciar Apache para aplicar la configuracion
+    - name: Reiniciar Apache
       service:
         name: apache2
         state: restarted
