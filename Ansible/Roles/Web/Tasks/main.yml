@@ -50,16 +50,13 @@
           
           <html>
           <body>
-            <?php
-            echo "<h1>Bienvenido</h1>"; ?>
-            <h3>Inicio de Sesión</h3>
+            <?php echo "<h1>Bienvenido</h1>"; ?>
+            <h3>Inicio de sesión</h3>
             <?php echo $error_msg; ?>
             
             <form action='index.php' method='GET'>
-              Usuario: <input type='text' name='user' required>
-              <br><br>
-              Contraseña: <input type='password' name='pass' required>
-              <br><br>
+              Usuario: <input type='text' name='user' required><br><br>
+              Contraseña: <input type='password' name='pass' required><br><br>
               <input type='submit' value='Entrar'>
             </form>
             <br>
@@ -72,8 +69,8 @@
         dest: /var/www/html/registro.php
         content: |
           <?php
-          echo "<h1>Bienvenido</h1>";
-          echo <h3>IRegistro de Usuarios</h3>
+          echo "<h1>Registro de Usuarios</h1>";
+
           if(isset($_GET['new_user']) && isset($_GET['new_pass'])) {
               try {
                   $conn = new mysqli("192.168.3.20", "admin", "1234", "proyecto_asir");
