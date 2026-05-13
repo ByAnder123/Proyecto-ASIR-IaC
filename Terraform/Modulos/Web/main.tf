@@ -1,52 +1,19 @@
-#==========================#
-# TARJETAS DE RED FIREWALL #
-#==========================#
-resource "aws_network_interface" "firewall_web" {
-    subnet_id = var.subred_web_id
-    private_ips = ["192.168.2.10"]
-    source_dest_check = false
-    tags = {
-        Name = "Red-Firewall-Web"
-    }
-}
-
-resource "aws_network_interface" "firewall_bd" {
-    subnet_id = var.subred_bd_id
-    private_ips = ["192.168.3.10"]
-    source_dest_check = false
-    tags = {
-        Name = "Red-Firewall-Datos"
-    }
-}
-
-#=================#
-# IP PÚBLICA FIJA #
-#=================#
-resource "aws_eip" "ip_fija_firewall" {
-    domain = "vpc"
-    network_interface = aws_instance.servidor_firewall.primary_network_interface_id
-    tags = {
-        Name = "EIP-Firewall"
-    }
-}
-
-#====================#
-# GRUPO DE SEGURIDAD #
-#====================#
-resource "aws_security_group" "sg_firewall" {
-    name = "SG-Firewall-Transparente"
-    description = "Permite todo el trafico para delegar el control a iptables"
+#====================================#
+# 1. GRUPO DE SEGURIDAD TRANSPARENTE #
+#====================================#
+resource "aws_security_group" "sg_web" {
+    name = "SG-Web"
+    description = "Permite trafico interno desde la VPC"
     vpc_id = var.vpc_id
 
-  # Entrada: Permitimos todo
+    # Permitir todo el tráfico interno de la VPC (El firewall ya filtró lo malo fuera)
     ingress {
         from_port = 0
         to_port = 0
-        protocol = "-1" 
-        cidr_blocks = ["0.0.0.0/0"] 
+        protocol = "-1"
+        cidr_blocks = [var.rango_vpc] 
     }
 
-    # Salida: Permitimos todo
     egress {
         from_port = 0
         to_port = 0
@@ -54,112 +21,114 @@ resource "aws_security_group" "sg_firewall" {
         cidr_blocks = ["0.0.0.0/0"]
     }
 
-    tags = {
-        Name = "SG-Transparente"
+    tags = { Name = "SG-Web" }
+}
+
+#===================================#
+# 2. EL BALANCEADOR DE CARGAS (ALB) #
+#===================================#
+resource "aws_lb" "balanceador_web" {
+    name = "ALB-Web-Interno"
+    internal = true 
+    load_balancer_type = "application"
+    security_groups = [aws_security_group.sg_web.id]
+    subnets = [var.subred_web_id, var.subred_alb_respaldo_id]
+}
+
+resource "aws_lb_target_group" "tg_web" {
+    name = "TG-Servidores-Web"
+    port = 80
+    protocol = "HTTP"
+    vpc_id = var.vpc_id
+}
+
+resource "aws_lb_listener" "puerta_enlace_alb" {
+    load_balancer_arn = aws_lb.balanceador_web.arn
+    port = "80"
+    protocol = "HTTP"
+
+    default_action {
+        type = "forward"
+        target_group_arn = aws_lb_target_group.tg_web.arn
     }
 }
 
-#============================#
-# MÁQUINA VIRTUAL - FIREWALL #
-#============================#
-resource "aws_instance" "servidor_firewall" {
-    ami = data.aws_ami.ubuntu.id
-    instance_type = "t3.small"
-    key_name = var.clave_ssh
-
-    # 1. Tarjeta principal (eth0) integrada en la máquina
-    subnet_id = var.subred_publica_id
-    private_ip = "192.168.1.10"
-    source_dest_check = false # Permite enrutamiento
-    vpc_security_group_ids = [aws_security_group.sg_firewall.id] # Enlazamos el firewall nativo
-
-    tags = {
-        Name = "VM-Firewall"
-    }
-}
-
-#=======================================#
-# CONEXIÓN DE LAS TARJETAS SECUNDARIAS  #
-#=======================================#
-# 2. Enchufamos la tarjeta de la LAN Web (eth1)
-resource "aws_network_interface_attachment" "attach_web" {
-    instance_id = aws_instance.servidor_firewall.id
-    network_interface_id = aws_network_interface.firewall_web.id
-    device_index = 1
-}
-
-# 3. Enchufamos la tarjeta de la LAN BD (eth2)
-resource "aws_network_interface_attachment" "attach_bd" {
-    instance_id = aws_instance.servidor_firewall.id
-    network_interface_id = aws_network_interface.firewall_bd.id
-    device_index = 2
-
-}
-
-#=========================#
-# IMAGEN UBUNTU 22.04 LTS #
-#=========================#
+#===========================#
+# 3. PLANTILLA DE CLONACIÓN #
+#===========================#
 data "aws_ami" "ubuntu" {
     most_recent = true
     filter {
-        name   = "name"
+        name = "name"
         values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
     }
-
     filter {
-        name   = "virtualization-type"
+        name = "virtualization-type"
         values = ["hvm"]
     }
-
-    owners = ["099720109477"] # ID creadores de Ubuntu
+    owners = ["099720109477"]
 }
 
-#========================#
-# TABLAS DE ENRUTAMIENTO #
-#========================#
-# Tabla de la Subred Web
-resource "aws_route_table" "rt_web" {
-    vpc_id = var.vpc_id
-    route {
-        cidr_block = "0.0.0.0/0"
-        network_interface_id = aws_network_interface.firewall_web.id
-    }
+resource "aws_launch_template" "plantilla_web" {
+    name_prefix = "Plantilla-Apache-"
+    image_id = data.aws_ami.ubuntu.id
+    instance_type = "t3.small" # Aumentamos la RAM para el servidor web y base de datos
+    key_name = var.clave_ssh
+    vpc_security_group_ids = [aws_security_group.sg_web.id]
 
-    route {
-        cidr_block = var.rango_subred_bd
-        network_interface_id = aws_network_interface.firewall_web.id
-    }
+    #==============================================#
+    # SISTEMA ANSIBLE-PULL (Configuración Autónoma)#
+    #==============================================#
+    user_data = base64encode(<<-EOF
+                #!/bin/bash
+                # 1. Instalamos Ansible y Git
+                apt-get update
+                apt-get install -y software-properties-common
+                add-apt-repository --yes --update ppa:ansible/ansible
+                apt-get install -y ansible git
 
-    tags = {
-        Name = "RT-Web-Firewall"
-    }
-}
+                # 2. Clonamos tu repositorio de GitHub (¡Sustituye esta URL!)
+                git clone https://github.com/TuUsuario/TuRepo.git /tmp/mi_proyecto
 
-# Tabla de la Subred BD
-resource "aws_route_table" "rt_bd" {
-    vpc_id = var.vpc_id
-    route {
-        cidr_block = "0.0.0.0/0"
-        network_interface_id = aws_network_interface.firewall_bd.id
-    }
+                # 3. Entramos en la carpeta y ejecutamos el playbook web localmente
+                cd /tmp/mi_proyecto/Ansible
+                ansible-playbook playbook_web.yml
+                EOF
+    )
 
-    route {
-        cidr_block = var.rango_subred_web
-        network_interface_id = aws_network_interface.firewall_bd.id
-    }
-
-    tags = {
-        Name = "RT-BD-Firewall"
+    tag_specifications {
+        resource_type = "instance"
+        tags = { Name = "VM-Clon-Web" }
     }
 }
 
-# Asociamos las tablas a las subredes
-resource "aws_route_table_association" "a_web" {
-    subnet_id = var.subred_web_id
-    route_table_id = aws_route_table.rt_web.id
+#=============================================#
+# 4. GRUPO DE AUTOESCALADO (ASG)              #
+#=============================================#
+resource "aws_autoscaling_group" "asg_web" {
+    name = "ASG-Cluster-Web"
+    vpc_zone_identifier = [var.subred_web_id]
+    target_group_arns = [aws_lb_target_group.tg_web.arn] 
+    
+    min_size = 1
+    max_size = 5
+    desired_capacity = 1
+
+    launch_template {
+        id = aws_launch_template.plantilla_web.id
+        version = "$Latest"
+    }
 }
 
-resource "aws_route_table_association" "a_bd" {
-    subnet_id = var.subred_bd_id
-    route_table_id = aws_route_table.rt_bd.id
+resource "aws_autoscaling_policy" "escalado_inteligente" {
+    name = "CPU_70"
+    autoscaling_group_name = aws_autoscaling_group.asg_web.name
+    policy_type = "TargetTrackingScaling"
+
+    target_tracking_configuration {
+        predefined_metric_specification {
+            predefined_metric_type = "ASGAverageCPUUtilization"
+        }
+        target_value = 70.0
+    }
 }

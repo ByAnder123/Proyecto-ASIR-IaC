@@ -15,8 +15,25 @@ resource "aws_network_interface" "firewall_bd" {
     private_ips = ["192.168.3.10"]
     source_dest_check = false
     tags = {
-        Name = "Red-Firewall-Datos"
+        Name = "Red-Firewall-BD"
     }
+}
+
+#=======================================#
+# CONEXIÓN DE LAS TARJETAS SECUNDARIAS  #
+#=======================================#
+# 2. Enchufamos la tarjeta de la LAN Web (eth1)
+resource "aws_network_interface_attachment" "attach_web" {
+    instance_id = aws_instance.servidor_firewall.id
+    network_interface_id = aws_network_interface.firewall_web.id
+    device_index = 1
+}
+
+# 3. Enchufamos la tarjeta de la LAN BD (eth2)
+resource "aws_network_interface_attachment" "attach_bd" {
+    instance_id = aws_instance.servidor_firewall.id
+    network_interface_id = aws_network_interface.firewall_bd.id
+    device_index = 2
 }
 
 #=================#
@@ -34,7 +51,7 @@ resource "aws_eip" "ip_fija_firewall" {
 # GRUPO DE SEGURIDAD #
 #====================#
 resource "aws_security_group" "sg_firewall" {
-    name = "SG-Firewall-Transparente"
+    name = "SG-Firewall"
     description = "Permite todo el trafico para delegar el control a iptables"
     vpc_id = var.vpc_id
 
@@ -55,7 +72,7 @@ resource "aws_security_group" "sg_firewall" {
     }
 
     tags = {
-        Name = "SG-Transparente"
+        Name = "SG-Firewall"
     }
 }
 
@@ -69,7 +86,7 @@ resource "aws_instance" "servidor_firewall" {
 
     # 1. Tarjeta principal (eth0) integrada en la máquina
     subnet_id = var.subred_publica_id
-    private_ip = "192.168.1.10"
+    private_ip = var.ip_privada_fw
     source_dest_check = false # Permite enrutamiento
     vpc_security_group_ids = [aws_security_group.sg_firewall.id] # Enlazamos el firewall nativo
 
@@ -78,36 +95,18 @@ resource "aws_instance" "servidor_firewall" {
     }
 }
 
-#=======================================#
-# CONEXIÓN DE LAS TARJETAS SECUNDARIAS  #
-#=======================================#
-# 2. Enchufamos la tarjeta de la LAN Web (eth1)
-resource "aws_network_interface_attachment" "attach_web" {
-    instance_id = aws_instance.servidor_firewall.id
-    network_interface_id = aws_network_interface.firewall_web.id
-    device_index = 1
-}
-
-# 3. Enchufamos la tarjeta de la LAN BD (eth2)
-resource "aws_network_interface_attachment" "attach_bd" {
-    instance_id = aws_instance.servidor_firewall.id
-    network_interface_id = aws_network_interface.firewall_bd.id
-    device_index = 2
-
-}
-
 #=========================#
 # IMAGEN UBUNTU 22.04 LTS #
 #=========================#
 data "aws_ami" "ubuntu" {
     most_recent = true
     filter {
-        name   = "name"
+        name = "name"
         values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
     }
 
     filter {
-        name   = "virtualization-type"
+        name = "virtualization-type"
         values = ["hvm"]
     }
 
@@ -122,7 +121,7 @@ resource "aws_route_table" "rt_web" {
     vpc_id = var.vpc_id
     route {
         cidr_block = "0.0.0.0/0"
-        network_interface_id = aws_network_interface.firewall_web.id
+        network_interface_id = aws_instance.servidor_firewall.primary_network_interface_id
     }
 
     route {
@@ -140,7 +139,7 @@ resource "aws_route_table" "rt_bd" {
     vpc_id = var.vpc_id
     route {
         cidr_block = "0.0.0.0/0"
-        network_interface_id = aws_network_interface.firewall_bd.id
+        network_interface_id = aws_instance.servidor_firewall.primary_network_interface_id
     }
 
     route {

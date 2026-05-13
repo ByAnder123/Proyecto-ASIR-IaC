@@ -1,0 +1,119 @@
+---
+# 1. Configurar las tarjetas de red secundarias (Netplan)
+- name: Crear archivo de configuracion para ens6 y ens7
+  copy:
+    dest: /etc/netplan/99-interfaces-secundarias.yaml
+    content: |
+      network:
+        version: 2
+        ethernets:
+          ens6:
+            dhcp4: no
+            addresses: [192.168.2.10/24]
+          ens7:
+            dhcp4: no
+            addresses: [192.168.3.10/24]
+
+# 2. Aplicar los cambios de red para que se enciendan
+- name: Aplicar configuracion de Netplan
+  command: netplan apply
+
+# 3. IP Forwarding
+- name: Activar IP Forwarding
+  sysctl:
+    name: net.ipv4.ip_forward
+    value: '1'
+    state: present
+    reload: yes
+
+# 4. Configurar el cortafuegos UFW
+- name: Permitir trafico SSH
+  ufw:
+    rule: allow
+    name: OpenSSH
+
+- name: Permitir trafico HTTP
+  ufw:
+    rule: allow
+    port: '80'
+    proto: tcp
+
+- name: Permitir trafico HTTPS
+  ufw:
+    rule: allow
+    port: '443'
+    proto: tcp
+
+# 5. Reglas de Enrutamiento
+- name: Permitir que la subred Web consulte a la BD (Puerto 3306)
+  ufw:
+    route: yes
+    rule: allow
+    proto: tcp
+    src: 192.168.2.0/24
+    dest: 192.168.3.0/24
+    port: '3306'
+
+- name: Permitir que las redes privadas salgan a Internet (FORWARD)
+  ufw:
+    route: yes
+    rule: allow
+    src: 192.168.0.0/16
+
+- name: Encender el cortafuegos UFW
+  ufw:
+    state: enabled
+    policy: deny # Bloquea todo lo que no hayamos permitido
+    direction: incoming
+
+# 6. Reglas NAT para dar Internet a las redes privadas
+- name: Permitir Forwarding global
+  lineinfile:
+    path: /etc/default/ufw
+    regexp: '^DEFAULT_FORWARD_POLICY='
+    line: 'DEFAULT_FORWARD_POLICY="ACCEPT"'
+
+- name: Inyectar regla NAT en el nucleo de UFW
+  blockinfile:
+    path: /etc/ufw/before.rules
+    insertbefore: BOF
+    marker: "# ANSIBLE MANAGED BLOCK - Regla NAT"
+    content: |
+      *nat
+      :POSTROUTING ACCEPT [0:0]
+      -A POSTROUTING -s 192.168.0.0/16 -j MASQUERADE
+      COMMIT
+
+- name: Recargar UFW para aplicar el NAT nativo
+  command: ufw reload
+
+# 7. Instalar Nginx para actuar como Proxy Inverso
+- name: Instalar Nginx
+  apt:
+    name: nginx
+    state: present
+    update_cache: yes
+
+# 8. Configurar Nginx para redirigir el trafico al Balanceador (ALB)
+- name: Configurar redireccion HTTP al Balanceador
+  copy:
+    dest: /etc/nginx/sites-available/default
+    content: |
+      server {
+          listen 80 default_server;
+          listen [::]:80 default_server;
+
+          location / {
+              # Aqui le decimos a Nginx que mande todo el trafico al ALB
+              proxy_pass http://{{ dns_alb }};
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $remote_addr;
+          }
+      }
+
+# 9. Reiniciar Nginx para aplicar los cambios
+- name: Reiniciar y habilitar servicio Nginx
+  service:
+    name: nginx
+    state: restarted
+    enabled: yes

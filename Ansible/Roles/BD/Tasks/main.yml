@@ -1,0 +1,87 @@
+---
+# 1. Instalación del software
+- name: Instalar MariaDB y dependencias de Python para Ansible
+  apt:
+    name: 
+      - mariadb-server
+      - python3-pymysql
+    state: present
+    update_cache: yes
+
+# 2. Permitir conexiones desde la subred Web
+- name: Configurar MariaDB para escuchar en la red interna
+  lineinfile:
+    path: /etc/mysql/mariadb.conf.d/50-server.cnf
+    regexp: '^bind-address'
+    line: 'bind-address = 0.0.0.0'
+  notify: Reiniciar MariaDB
+
+# 3. Securización
+- name: Usuario root de MariaDB
+  mysql_user:
+    name: root
+    password: "Password123"
+    login_user: root
+    login_password: "Password123"
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+    check_implicit_admin: yes
+    plugin: mysql_native_password
+    state: present
+
+- name: Eliminar usuarios anonimos
+  mysql_user:
+    name: ""
+    state: absent
+    login_user: root
+    login_password: "Password123"
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+
+- name: Eliminar base de datos de prueba
+  mysql_db:
+    name: test
+    state: absent
+    login_user: root
+    login_password: "Password123"
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+
+# 4. Preparación para el Login de la Web
+- name: Crear la base de datos del proyecto
+  mysql_db:
+    name: proyecto_asir
+    state: present
+    login_user: root
+    login_password: "Password123"
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+
+- name: Cuenta de servicio
+  mysql_user:
+    name: admin
+    password: "1234"
+    priv: 'proyecto_asir.*:ALL'
+    host: '192.168.2.%'
+    state: present
+    login_user: root
+    login_password: "Password123"
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+
+# 5. Tabla de usuarios
+- name: Crear tabla de usuarios
+  mysql_query:
+    login_db: proyecto_asir
+    query: |
+      CREATE TABLE IF NOT EXISTS usuarios (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        usuario VARCHAR(20) NOT NULL UNIQUE,
+        password VARCHAR(15) NOT NULL
+      );
+    login_user: root
+    login_password: "Password123"
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+
+- name: Insertar usuario de prueba para el login
+  mysql_query:
+    login_db: proyecto_asir
+    query: "INSERT INTO usuarios (usuario, password) SELECT 'usuario', 'usuario' WHERE NOT EXISTS (SELECT usuario FROM usuarios WHERE usuario='usuario');"
+    login_user: root
+    login_password: "Password123"
+    login_unix_socket: /var/run/mysqld/mysqld.sock

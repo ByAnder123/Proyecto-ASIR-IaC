@@ -1,0 +1,113 @@
+---
+- name: Autoconfiguracion del Servidor Web (Autoescalado con redireccion)
+  hosts: localhost
+  connection: local
+  tasks:
+    - name: Instalar Apache, PHP y dependencias de MySQL
+      apt:
+        name: 
+          - apache2
+          - php
+          - libapache2-mod-php
+          - php-mysql
+        state: present
+        update_cache: yes
+
+    - name: Renombrar la pagina por defecto de Apache (La usaremos como Dashboard)
+      command: mv /var/www/html/index.html /var/www/html/dashboard.html
+      args:
+        creates: /var/www/html/dashboard.html # Idempotencia: solo lo hace si no existe
+
+    - name: Crear pagina principal y de Login (index.php)
+      copy:
+        dest: /var/www/html/index.php
+        content: |
+          <?php
+          // 1. LÓGICA DE LOGIN (Debe ir antes de cualquier HTML)
+          $error_msg = "";
+          if(isset($_GET['user']) && isset($_GET['pass'])) {
+              $conn = new mysqli("192.168.3.20", "admin", "1234", "proyecto_asir");
+              if ($conn->connect_error) {
+                  die("Conexion fallida: " . $conn->connect_error);
+              }
+              
+              $u = $_GET['user'];
+              $p = $_GET['pass'];
+              
+              $sql = "SELECT * FROM usuarios WHERE usuario='$u' AND password='$p'";
+              $result = $conn->query($sql);
+              
+              if ($result->num_rows > 0) {
+                  // ¡ÉXITO! Redirigimos a la página por defecto de Apache
+                  header("Location: dashboard.html");
+                  exit();
+              } else {
+                  $error_msg = "<p style='color:red;'><b>Error:</b> Credenciales incorrectas.</p>";
+              }
+              $conn->close();
+          }
+          ?>
+          
+          <html>
+          <body>
+            <?php echo "<h1>Bienvenido al Nodo: " . gethostname() . "</h1>"; ?>
+            <h3>Sistema de Acceso Seguro</h3>
+            <?php echo $error_msg; ?>
+            
+            <form action='index.php' method='GET'>
+              Usuario: <input type='text' name='user' required><br><br>
+              Contraseña: <input type='password' name='pass' required><br><br>
+              <input type='submit' value='Entrar'>
+            </form>
+            <br>
+            <a href='registro.php'>Registrar un nuevo usuario</a>
+          </body>
+          </html>
+
+    - name: Crear pagina de Registro (registro.php)
+      copy:
+        dest: /var/www/html/registro.php
+        content: |
+          <?php
+          echo "<h1>Registro de Usuarios</h1>";
+
+          if(isset($_GET['new_user']) && isset($_GET['new_pass'])) {
+              $conn = new mysqli("192.168.3.20", "admin", "1234", "proyecto_asir");
+              if ($conn->connect_error) {
+                  die("Conexion fallida.");
+              }
+              
+              $u = $_GET['new_user'];
+              $p = $_GET['new_pass'];
+              
+              // Intentamos crear el usuario
+              $sql = "INSERT INTO usuarios (usuario, password) VALUES ('$u', '$p')";
+              
+              if ($conn->query($sql) === TRUE) {
+                  echo "<p style='color:green;'><b>Exito:</b> El usuario '$u' ha sido registrado. Ya puedes hacer login.</p>";
+              } else {
+                  echo "<p style='color:red;'><b>Error al registrar:</b> Ese nombre de usuario ya esta en uso.</p>";
+              }
+              $conn->close();
+          }
+
+          echo "<form action='registro.php' method='GET'>";
+          echo "Nuevo Usuario: <input type='text' name='new_user' required><br><br>";
+          echo "Nueva Contraseña: <input type='password' name='new_pass' required><br><br>";
+          echo "<input type='submit' value='Registrar'>";
+          echo "</form>";
+          echo "<br><br><a href='index.php'>Volver al Login</a>";
+          ?>
+
+    - name: Asegurar permisos correctos para el servidor web
+      file:
+        path: /var/www/html
+        owner: www-data
+        group: www-data
+        recurse: yes
+
+    - name: Reiniciar Apache para aplicar la configuracion
+      service:
+        name: apache2
+        state: restarted
+        enabled: yes

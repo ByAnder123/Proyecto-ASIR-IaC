@@ -5,6 +5,7 @@ override.tf
 override.tf.json
 *_override.tf
 *_override.tf.json
+*.pem
 
 # Directorio de Terraform (Plugins y módulos descargados)
 .terraform/

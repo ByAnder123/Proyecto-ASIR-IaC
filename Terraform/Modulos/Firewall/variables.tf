@@ -32,3 +32,9 @@ variable "clave_ssh" {
     description = "El nombre exacto de la clave SSH creada en la consola de AWS"
     type = string
 }
+
+variable "ip_privada_fw" {
+    description = "IP fija interna para el Firewall"
+    type = string
+    default = "192.168.1.10"
+}

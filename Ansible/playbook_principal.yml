@@ -1,0 +1,12 @@
+---
+- name: Despliegue y Configuracion del Firewall
+  hosts: firewall
+  become: yes  # Ejecutar todo como root"
+  roles:
+    - Firewall
+
+- name: Despliegue y Configuracion de la Base de Datos
+  hosts: BD
+  become: yes  # Ejecutar todo como root"
+  roles:
+    - BD
