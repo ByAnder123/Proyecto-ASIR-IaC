@@ -26,7 +26,6 @@
           $error_msg = "";
           if(isset($_GET['user']) && isset($_GET['pass'])) {
               try {
-                  // Intentamos la conexion y la consulta
                   $conn = new mysqli("192.168.3.20", "admin", "1234", "proyecto_asir");
                   
                   $u = $_GET['user'];
@@ -42,8 +41,8 @@
                       $error_msg = "<p style='color:red;'><b>Error:</b> Credenciales incorrectas.</p>";
                   }
                   $conn->close();
+                  
               } catch (Exception $e) {
-                  // Si PHP 8.1 lanza una excepcion, la atrapamos aqui
                   $error_msg = "<p style='color:red;'><b>Excepcion Capturada:</b> " . $e->getMessage() . "</p>";
               }
           }
@@ -51,13 +50,16 @@
           
           <html>
           <body>
-            <?php echo "<h1>Bienvenido al Nodo: " . gethostname() . "</h1>"; ?>
-            <h3>Sistema de Acceso Seguro</h3>
+            <?php
+            echo "<h1>Bienvenido</h1>"; ?>
+            <h3>Inicio de Sesión</h3>
             <?php echo $error_msg; ?>
             
             <form action='index.php' method='GET'>
-              Usuario: <input type='text' name='user' required><br><br>
-              Contraseña: <input type='password' name='pass' required><br><br>
+              Usuario: <input type='text' name='user' required>
+              <br><br>
+              Contraseña: <input type='password' name='pass' required>
+              <br><br>
               <input type='submit' value='Entrar'>
             </form>
             <br>
@@ -70,8 +72,8 @@
         dest: /var/www/html/registro.php
         content: |
           <?php
-          echo "<h1>Registro de Usuarios</h1>";
-
+          echo "<h1>Bienvenido</h1>";
+          echo <h3>IRegistro de Usuarios</h3>
           if(isset($_GET['new_user']) && isset($_GET['new_pass'])) {
               try {
                   $conn = new mysqli("192.168.3.20", "admin", "1234", "proyecto_asir");
@@ -94,7 +96,7 @@
           echo "Nueva Contraseña: <input type='password' name='new_pass' required><br><br>";
           echo "<input type='submit' value='Registrar'>";
           echo "</form>";
-          echo "<br><br><a href='index.php'>Volver al Login</a>";
+          echo "<br><a href='index.php'>Volver al Login</a>";
           ?>
 
     - name: Asegurar permisos correctos para el servidor web

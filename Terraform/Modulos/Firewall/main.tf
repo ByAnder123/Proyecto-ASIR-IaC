@@ -21,17 +21,17 @@ resource "aws_network_interface" "firewall_bd" {
     }
 }
 
-#=======================================#
-# CONEXIÓN DE LAS TARJETAS SECUNDARIAS  #
-#=======================================#
-# 2. Enchufamos la tarjeta de la LAN Web (eth1)
+#======================================#
+# CONEXIÓN DE LAS TARJETAS SECUNDARIAS #
+#======================================#
+# Enchufamos la tarjeta de la LAN Web (eth1)
 resource "aws_network_interface_attachment" "attach_web" {
     instance_id = aws_instance.servidor_firewall.id
     network_interface_id = aws_network_interface.firewall_web.id
     device_index = 1
 }
 
-# 3. Enchufamos la tarjeta de la LAN BD (eth2)
+# Enchufamos la tarjeta de la LAN BD (eth2)
 resource "aws_network_interface_attachment" "attach_bd" {
     instance_id = aws_instance.servidor_firewall.id
     network_interface_id = aws_network_interface.firewall_bd.id
@@ -57,7 +57,7 @@ resource "aws_security_group" "sg_firewall" {
     description = "Permite todo el trafico para delegar el control a iptables"
     vpc_id = var.vpc_id
 
-  # Entrada: Permitimos todo
+    # Entrada: Permitimos todo
     ingress {
         from_port = 0
         to_port = 0
@@ -112,7 +112,7 @@ data "aws_ami" "ubuntu" {
         values = ["hvm"]
     }
 
-    owners = ["099720109477"] # ID creadores de Ubuntu
+    owners = ["099720109477"]
 }
 
 #========================#

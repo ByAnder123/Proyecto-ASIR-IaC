@@ -6,7 +6,7 @@ resource "aws_security_group" "sg_bd" {
     description = "Permitir todo el trafico interno."
     vpc_id = var.vpc_id
 
-    # Entrada: Permitimos todo, pero solo desde dentro de la red VPC
+    # Entrada: Permitimos todo
     ingress {
         from_port = 0
         to_port = 0
@@ -42,7 +42,7 @@ data "aws_ami" "ubuntu" {
         values = ["hvm"]
     }
 
-    owners = ["099720109477"] # ID creadores de Ubuntu
+    owners = ["099720109477"]
 }
 
 #======================#

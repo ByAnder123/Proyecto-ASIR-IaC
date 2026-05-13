@@ -1,5 +1,5 @@
 ---
-# 1. Configurar las tarjetas de red secundarias (Netplan)
+# 1. Configurar las tarjetas de red secundarias
 - name: Crear archivo de configuracion para ens6 y ens7
   copy:
     dest: /etc/netplan/99-interfaces-secundarias.yaml
@@ -14,7 +14,7 @@
             dhcp4: no
             addresses: [192.168.3.10/24]
 
-# 2. Aplicar los cambios de red para que se enciendan
+# 2. Aplicar los cambios de red
 - name: Aplicar configuracion de Netplan
   command: netplan apply
 
@@ -38,12 +38,6 @@
     port: '80'
     proto: tcp
 
-- name: Permitir trafico HTTPS
-  ufw:
-    rule: allow
-    port: '443'
-    proto: tcp
-
 # 5. Reglas de Enrutamiento
 - name: Permitir que la subred Web consulte a la BD (Puerto 3306)
   ufw:
@@ -63,7 +57,7 @@
 - name: Encender el cortafuegos UFW
   ufw:
     state: enabled
-    policy: deny # Bloquea todo lo que no hayamos permitido
+    policy: deny
     direction: incoming
 
 # 6. Reglas NAT para dar Internet a las redes privadas
@@ -76,8 +70,7 @@
 - name: Inyectar regla NAT en el nucleo de UFW
   blockinfile:
     path: /etc/ufw/before.rules
-    insertbefore: BOF
-    marker: "# ANSIBLE MANAGED BLOCK - Regla NAT"
+    insertbefore: '^\*filter'
     content: |
       *nat
       :POSTROUTING ACCEPT [0:0]
@@ -94,7 +87,7 @@
     state: present
     update_cache: yes
 
-# 8. Configurar Nginx para redirigir el trafico al Balanceador (ALB)
+# 8. Configurar Nginx para redirigir el trafico al ALB
 - name: Configurar redireccion HTTP al Balanceador
   copy:
     dest: /etc/nginx/sites-available/default

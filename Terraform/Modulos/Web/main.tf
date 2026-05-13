@@ -1,19 +1,19 @@
-#====================================#
-# 1. GRUPO DE SEGURIDAD TRANSPARENTE #
-#====================================#
+#=================================#
+# GRUPO DE SEGURIDAD TRANSPARENTE #
+#=================================#
 resource "aws_security_group" "sg_web" {
     name = "SG-Web"
     description = "Permite trafico interno desde la VPC"
     vpc_id = var.vpc_id
 
-    # Permitir todo el tráfico interno de la VPC (El firewall ya filtró lo malo fuera)
+    # Entrada: Permitimos todo
     ingress {
         from_port = 0
         to_port = 0
         protocol = "-1"
         cidr_blocks = [var.rango_vpc] 
     }
-
+    # Salida: Permitimos todo
     egress {
         from_port = 0
         to_port = 0
@@ -24,9 +24,9 @@ resource "aws_security_group" "sg_web" {
     tags = { Name = "SG-Web" }
 }
 
-#===================================#
-# 2. EL BALANCEADOR DE CARGAS (ALB) #
-#===================================#
+#=============================#
+# BALANCEADOR DE CARGAS (ALB) #
+#=============================#
 resource "aws_lb" "balanceador_web" {
     name = "ALB-Web-Interno"
     internal = true 
@@ -53,9 +53,9 @@ resource "aws_lb_listener" "puerta_enlace_alb" {
     }
 }
 
-#===========================#
-# 3. PLANTILLA DE CLONACIÓN #
-#===========================#
+#========================#
+# PLANTILLA DE CLONACIÓN #
+#========================#
 data "aws_ami" "ubuntu" {
     most_recent = true
     filter {
@@ -70,9 +70,9 @@ data "aws_ami" "ubuntu" {
 }
 
 resource "aws_launch_template" "plantilla_web" {
-    name_prefix = "Plantilla-Apache-"
+    name_prefix = "Plantilla-Apache"
     image_id = data.aws_ami.ubuntu.id
-    instance_type = "t3.small" # Aumentamos la RAM para el servidor web y base de datos
+    instance_type = "t3.small"
     key_name = var.clave_ssh
     vpc_security_group_ids = [aws_security_group.sg_web.id]
 
@@ -83,7 +83,7 @@ user_data = base64encode(<<-EOF
             #!/bin/bash
 
             sleep 90
-            
+
             # 1. Instalamos Ansible y Git
             apt-get update
             apt-get install -y software-properties-common
@@ -105,9 +105,9 @@ user_data = base64encode(<<-EOF
     }
 }
 
-#=============================================#
-# 4. GRUPO DE AUTOESCALADO (ASG)              #
-#=============================================#
+#=============================#
+# GRUPO DE AUTOESCALADO (ASG) #
+#=============================#
 resource "aws_autoscaling_group" "asg_web" {
     name = "ASG-Cluster-Web"
     vpc_zone_identifier = [var.subred_web_id]

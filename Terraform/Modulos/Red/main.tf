@@ -47,7 +47,7 @@ resource "aws_subnet" "sub_bd" {
     }
 }
 
-# Subred de respaldo SOLO para cumplir el requisito del Balanceador
+# Subred de respaldo SOLO para cumplir el requisito del ALB
 resource "aws_subnet" "sub_alb_respaldo" {
     vpc_id            = aws_vpc.red_principal.id
     cidr_block        = "192.168.4.0/24"
