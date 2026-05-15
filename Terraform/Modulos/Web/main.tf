@@ -27,7 +27,7 @@ resource "aws_security_group" "sg_web" {
 #=============================#
 # BALANCEADOR DE CARGAS (ALB) #
 #=============================#
-resource "aws_lb" "balanceador_web" {
+resource "aws_alb" "balanceador_web" {
     name = "ALB-Web-Interno"
     internal = true 
     load_balancer_type = "application"
@@ -35,21 +35,21 @@ resource "aws_lb" "balanceador_web" {
     subnets = [var.subred_web_id, var.subred_alb_respaldo_id]
 }
 
-resource "aws_lb_target_group" "tg_web" {
+resource "aws_alb_target_group" "tg_web" {
     name = "TG-Servidores-Web"
     port = 80
     protocol = "HTTP"
     vpc_id = var.vpc_id
 }
 
-resource "aws_lb_listener" "puerta_enlace_alb" {
-    load_balancer_arn = aws_lb.balanceador_web.arn
+resource "aws_alb_listener" "puerta_enlace_alb" {
+    load_balancer_arn = aws_alb.balanceador_web.arn
     port = "80"
     protocol = "HTTP"
 
     default_action {
         type = "forward"
-        target_group_arn = aws_lb_target_group.tg_web.arn
+        target_group_arn = aws_alb_target_group.tg_web.arn
     }
 }
 
@@ -82,7 +82,14 @@ resource "aws_launch_template" "plantilla_web" {
 user_data = base64encode(<<-EOF
             #!/bin/bash
 
-            sleep 90
+            echo "Esperando a que el Firewall otorgue acceso a Internet HTTP/HTTPS..."
+
+            while ! curl -s -m 2 https://www.google.com > /dev/null; do
+                echo "Aún no hay conexión... Reintentando en 5 segundos."
+                sleep 5
+            done
+
+            echo "¡Conexión a Internet establecida! Iniciando instalación..."
 
             # 1. Instalamos Ansible y Git
             apt-get update
@@ -111,7 +118,7 @@ user_data = base64encode(<<-EOF
 resource "aws_autoscaling_group" "asg_web" {
     name = "ASG-Cluster-Web"
     vpc_zone_identifier = [var.subred_web_id]
-    target_group_arns = [aws_lb_target_group.tg_web.arn] 
+    target_group_arns = [aws_alb_target_group.tg_web.arn] 
     
     min_size = 1
     max_size = 5
