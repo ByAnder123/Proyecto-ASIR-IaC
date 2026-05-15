@@ -1,4 +1,4 @@
-# Archivos de configuración local y variables con secretos (¡Tus claves de AWS!)
+# Archivos de configuración local y variables con secretos
 *.tfvars
 *.tfvars.json
 override.tf
@@ -8,14 +8,11 @@ override.tf.json
 *.pem
 inventario.ini
 
-# Directorio de Terraform (Plugins y módulos descargados)
+# Directorio de Terraform
 .terraform/
 
-# Archivos de estado (¡Contienen tu infraestructura en texto plano, incluyendo secretos!)
+# Archivos de estado
 *.tfstate
 *.tfstate.*
 crash.log
 crash.*.log
-
-# Ignorar binarios de Terraform (como tu terraform.exe)
-terraform.exe
