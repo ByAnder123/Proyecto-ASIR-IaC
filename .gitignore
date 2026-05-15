@@ -1,5 +1,4 @@
 # Archivos de configuración local y variables con secretos
-*.tfvars
 *.tfvars.json
 override.tf
 override.tf.json
